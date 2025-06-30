@@ -61,9 +61,9 @@ class DistanceMatrix:
         np.fill_diagonal(matrix, 0.0)
         return matrix
     
-    def get_distance(self, dog1_id: str, dog2_id: str) -> float:
-    """Get distance between two dogs with caching - 0 means not allowed"""
-        if dog1_id == dog2_id:
+def get_distance(self, dog1_id: str, dog2_id: str) -> float:
+    """Get distance between two dogs with caching - 0 means not allowed"""  #
+    if dog1_id == dog2_id:  #
         return 0.0  # Same dog
     
     idx1 = self._id_to_index.get(dog1_id)
