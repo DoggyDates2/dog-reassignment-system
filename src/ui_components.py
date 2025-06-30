@@ -309,6 +309,115 @@ class DashboardUI:
     def _render_reassignment_tab(self):
         """Render reassignment interface"""
         st.header("🎯 Driver Callout & Reassignment")
+        # ADD THIS DEBUG CODE TO YOUR _render_reassignment_tab METHOD
+# Find the line that says: st.header("🎯 Driver Callout & Reassignment")
+# Add this code RIGHT AFTER that line:
+
+def _render_reassignment_tab(self):
+    """Render reassignment interface"""
+    st.header("🎯 Driver Callout & Reassignment")
+    
+    # ===== ADD THIS DEBUG SECTION =====
+    st.subheader("🔧 Debug Analysis")
+    dm = self.session_state.data_manager
+    
+    # Check data overlap
+    todays_dogs = set(dm.dogs.keys())
+    matrix_dogs = set(dm.distance_matrix.dog_ids) if dm.distance_matrix else set()
+    missing_from_matrix = todays_dogs - matrix_dogs
+    overlap = len(todays_dogs & matrix_dogs)
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Today's Dogs", len(todays_dogs))
+    with col2:
+        st.metric("Matrix Dogs", len(matrix_dogs))
+    with col3:
+        st.metric("Overlap", overlap)
+    with col4:
+        st.metric("Missing", len(missing_from_matrix))
+    
+    if missing_from_matrix:
+        st.error(f"❌ {len(missing_from_matrix)} dogs missing from distance matrix (causes 0.5 distances)")
+        with st.expander("Missing Dogs"):
+            for i, dog_id in enumerate(sorted(missing_from_matrix)):
+                if i < 10:
+                    dog = dm.dogs.get(dog_id)
+                    st.write(f"• {dog_id} - {dog.name if dog else 'Unknown'}")
+                elif i == 10:
+                    st.write(f"... and {len(missing_from_matrix) - 10} more")
+                    break
+    else:
+        st.success("✅ All dogs found in distance matrix")
+    
+    # Check driver availability for Aidan callout
+    st.subheader("🚗 Driver Availability Check")
+    
+    # Simulate calling out Aidan for groups 1,2,3
+    called_out_driver = "Aidan"
+    affected_groups = [1, 2, 3]
+    
+    available_drivers = []
+    unavailable_reasons = {}
+    
+    for driver_name, driver in dm.drivers.items():
+        if driver_name == called_out_driver:
+            continue
+            
+        reasons = []
+        
+        # Check callouts
+        if len(driver.callouts) >= 3:
+            reasons.append("Called out all groups")
+        elif any(group in driver.callouts for group in affected_groups):
+            called_out_groups = [g for g in affected_groups if g in driver.callouts]
+            reasons.append(f"Called out groups {called_out_groups}")
+        
+        # Check capacity
+        current_loads = dm.get_driver_current_loads(driver_name)
+        capacity_issues = []
+        for group in affected_groups:
+            capacity = driver.get_capacity(group)
+            load = current_loads.get(group, 0)
+            available = capacity - load
+            if available <= 0:
+                capacity_issues.append(f"Group {group}: {available}/{capacity}")
+        
+        if capacity_issues:
+            reasons.append(f"No capacity: {', '.join(capacity_issues)}")
+        
+        if not reasons:
+            available_drivers.append(driver_name)
+        else:
+            unavailable_reasons[driver_name] = reasons
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Available Drivers", len(available_drivers))
+        if available_drivers:
+            st.success("Available: " + ", ".join(available_drivers[:5]))
+            if len(available_drivers) > 5:
+                st.write(f"... and {len(available_drivers) - 5} more")
+    
+    with col2:
+        st.metric("Unavailable Drivers", len(unavailable_reasons))
+        if unavailable_reasons:
+            st.error("❌ Reasons drivers unavailable:")
+            for driver, reasons in list(unavailable_reasons.items())[:3]:
+                st.write(f"• {driver}: {', '.join(reasons)}")
+    
+    if len(available_drivers) == 0:
+        st.error("🚨 NO AVAILABLE DRIVERS - This is why you get 'nan' assignments!")
+    
+    st.divider()
+    # ===== END DEBUG SECTION =====
+    
+    # Continue with your existing code...
+    dm = self.session_state.data_manager
+    
+    # Driver and group selection
+    col1, col2 = st.columns([2, 1])
+    # ... rest of your existing method continues unchanged
         
         dm = self.session_state.data_manager
         
