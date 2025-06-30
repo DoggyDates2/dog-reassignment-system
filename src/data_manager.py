@@ -134,21 +134,20 @@ class DataManager:
         self.distance_matrix: Optional[DistanceMatrix] = None
         self._load_errors: List[str] = []
     
-    @st.cache_data(ttl=300)  # Cache for 5 minutes
-    def load_from_urls(_self, map_url: str, matrix_url: str) -> bool:
+    def load_from_urls(self, map_url: str, matrix_url: str) -> bool:
         """Load and parse data from Google Sheets URLs"""
-try:
+        try:
             with st.spinner("📥 Loading map data..."):
                 map_df = pd.read_csv(map_url, dtype=str, on_bad_lines='skip', encoding='utf-8')
             
             with st.spinner("📥 Loading distance matrix..."):
                 matrix_df = pd.read_csv(matrix_url, dtype=str, on_bad_lines='skip', encoding='utf-8')
             
-            return _self._process_raw_data(map_df, matrix_df)
-                
+            return self._process_raw_data(map_df, matrix_df)
+            
         except Exception as e:
             st.error(f"Failed to load data: {e}")
-            _self._load_errors.append(f"URL loading error: {e}")
+            self._load_errors.append(f"URL loading error: {e}")
             return False
     
     def _process_raw_data(self, map_df: pd.DataFrame, matrix_df: pd.DataFrame) -> bool:
