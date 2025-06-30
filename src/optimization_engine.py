@@ -246,3 +246,186 @@ class SimulatedAnnealingOptimizer:
                 current_solution = neighbor
                 
                 if neighbor_quality < best_solution.quality_score():
+                    best_solution = neighbor
+            
+            temperature *= cooling_rate
+            
+            # Early termination if temperature is very low
+            if temperature < 1e-6:
+                break
+        
+        best_solution.strategy_used = "Simulated Annealing"
+        return best_solution
+    
+    def _generate_random_solution(self, dogs_to_reassign: List) -> Optional[AssignmentSolution]:
+        """Generate a random valid solution"""
+        assignments = {}
+        
+        for dog in dogs_to_reassign:
+            valid_drivers = self._get_valid_drivers_for_dog(dog)
+            if valid_drivers:
+                assignments[dog.dog_id] = np.random.choice(valid_drivers)
+        
+        if assignments:
+            return self._create_solution_from_assignments(assignments, "Random Initial")
+        
+        return None
+    
+    def _generate_neighbor(self, solution: AssignmentSolution, dogs: List) -> Optional[AssignmentSolution]:
+        """Generate a neighbor solution by modifying current assignment"""
+        if len(solution.assignments) < 2:
+            return None
+        
+        # Strategy: Reassign single dog
+        dog_ids = list(solution.assignments.keys())
+        dog_id = np.random.choice(dog_ids)
+        dog = next((d for d in dogs if d.dog_id == dog_id), None)
+        
+        if not dog:
+            return None
+        
+        valid_drivers = self._get_valid_drivers_for_dog(dog)
+        current_driver = solution.assignments[dog_id]
+        
+        # Remove current driver to force a different assignment
+        valid_drivers = [d for d in valid_drivers if d != current_driver]
+        
+        if valid_drivers:
+            new_driver = np.random.choice(valid_drivers)
+            new_assignments = dict(solution.assignments)
+            new_assignments[dog_id] = new_driver
+            return self._create_solution_from_assignments(new_assignments, solution.strategy_used)
+        
+        return None
+    
+    def _get_valid_drivers_for_dog(self, dog) -> List[str]:
+        """Get list of drivers that can accept this dog"""
+        valid = []
+        
+        for driver_name, driver in self.data_manager.drivers.items():
+            if driver_name == getattr(dog, 'current_driver', None):
+                continue
+            
+            # Check callouts
+            if any(group in driver.callouts for group in dog.groups):
+                continue
+            
+            # Check capacity (simplified)
+            current_loads = self.data_manager.get_driver_current_loads(driver_name)
+            can_fit = True
+            
+            for group in dog.groups:
+                available = driver.get_capacity(group) - current_loads.get(group, 0)
+                if available < dog.num_dogs:
+                    can_fit = False
+                    break
+            
+            if can_fit:
+                valid.append(driver_name)
+        
+        return valid
+    
+    def _create_solution_from_assignments(self, assignments: Dict[str, str], strategy: str) -> AssignmentSolution:
+        """Create AssignmentSolution from assignments dict"""
+        total_distance = 0
+        
+        for dog_id, driver_name in assignments.items():
+            if dog_id in self.data_manager.dogs:
+                distance = self._calculate_assignment_distance(dog_id, driver_name)
+                total_distance += distance
+        
+        return AssignmentSolution(
+            assignments=assignments,
+            total_distance=total_distance,
+            load_balance_score=self._calculate_load_balance(assignments),
+            constraint_violations=self._count_violations(assignments),
+            strategy_used=strategy
+        )
+    
+    def _calculate_assignment_distance(self, dog_id: str, driver_name: str) -> float:
+        """Calculate distance cost for a single assignment"""
+        if not self.data_manager.distance_matrix:
+            return 1.0
+        
+        driver_dogs = self.data_manager.get_dogs_for_driver(driver_name)
+        if not driver_dogs:
+            return 0.5
+        
+        min_distance = float('inf')
+        for other_dog_id in driver_dogs:
+            if other_dog_id != dog_id:
+                distance = self.data_manager.distance_matrix.get_distance(dog_id, other_dog_id)
+                min_distance = min(min_distance, distance)
+        
+        return min_distance if min_distance != float('inf') else 1.0
+    
+    def _calculate_load_balance(self, assignments: Dict[str, str]) -> float:
+        """Calculate load balance score"""
+        # Simplified load balance calculation
+        driver_loads = defaultdict(int)
+        
+        for dog_id, driver_name in assignments.items():
+            if dog_id in self.data_manager.dogs:
+                dog = self.data_manager.dogs[dog_id]
+                driver_loads[driver_name] += dog.num_dogs
+        
+        loads = list(driver_loads.values())
+        return np.std(loads) if len(loads) > 1 else 0
+    
+    def _count_violations(self, assignments: Dict[str, str]) -> int:
+        """Count constraint violations"""
+        violations = 0
+        
+        for dog_id, driver_name in assignments.items():
+            if dog_id not in self.data_manager.dogs or driver_name not in self.data_manager.drivers:
+                violations += 1
+                continue
+            
+            dog = self.data_manager.dogs[dog_id]
+            driver = self.data_manager.drivers[driver_name]
+            
+            # Check callouts
+            if any(group in driver.callouts for group in dog.groups):
+                violations += 1
+        
+        return violations
+
+class MultiAlgorithmOptimizer:
+    """Combines multiple optimization strategies to find the best solution"""
+    
+    def __init__(self, data_manager):
+        self.data_manager = data_manager
+        self.hungarian = HungarianOptimizer(data_manager)
+        self.simulated_annealing = SimulatedAnnealingOptimizer(data_manager)
+    
+    def optimize(self, dogs_to_reassign: List) -> Optional[AssignmentSolution]:
+        """Run multiple optimization strategies and return the best solution"""
+        if not dogs_to_reassign:
+            return None
+        
+        solutions = []
+        
+        # Strategy 1: Hungarian Algorithm
+        try:
+            hungarian_solution = self.hungarian.optimize(dogs_to_reassign)
+            if hungarian_solution:
+                solutions.append(hungarian_solution)
+        except Exception:
+            pass
+        
+        # Strategy 2: Simulated Annealing with Hungarian initial solution
+        try:
+            initial = hungarian_solution if 'hungarian_solution' in locals() else None
+            sa_solution = self.simulated_annealing.optimize(dogs_to_reassign, initial)
+            if sa_solution:
+                solutions.append(sa_solution)
+        except Exception:
+            pass
+        
+        # Return best solution
+        if solutions:
+            best_solution = min(solutions, key=lambda s: s.quality_score())
+            best_solution.strategy_used = f"Multi-Algorithm ({best_solution.strategy_used})"
+            return best_solution
+        
+        return None
