@@ -139,10 +139,10 @@ class DataManager:
         """Load and parse data from Google Sheets URLs"""
         try:
             with st.spinner("📥 Loading map data..."):
-                map_df = pd.read_csv(map_url, dtype=str)
-            
-            with st.spinner("📥 Loading distance matrix..."):
-                matrix_df = pd.read_csv(matrix_url, dtype=str)
+    map_df = pd.read_csv(map_url, dtype=str, on_bad_lines='skip', encoding='utf-8')
+
+with st.spinner("📥 Loading distance matrix..."):
+    matrix_df = pd.read_csv(matrix_url, dtype=str, on_bad_lines='skip', encoding='utf-8')
             
             return _self._process_raw_data(map_df, matrix_df)
             
