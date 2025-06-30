@@ -57,10 +57,10 @@ class DistanceMatrix:
     """Optimized distance matrix with caching and validation"""
     
     def __init__(self, raw_matrix_df: pd.DataFrame):
-        self._validate_matrix(raw_matrix_df)
-        self.dog_ids = [str(col).strip() for col in raw_matrix_df.columns[1:]]
-        self._matrix = self._build_numpy_matrix(raw_matrix_df)
-        self._id_to_index = {dog_id: i for i, dog_id in enumerate(self.dog_ids)}
+    self._validate_matrix(raw_matrix_df)
+    self.dog_ids = [str(col).strip() for col in raw_matrix_df.columns[1:]]
+    self._id_to_index = {dog_id: i for i, dog_id in enumerate(self.dog_ids)}
+    self._matrix = self._build_numpy_matrix(raw_matrix_df)
     
     def _validate_matrix(self, df: pd.DataFrame):
         """Validate distance matrix format"""
