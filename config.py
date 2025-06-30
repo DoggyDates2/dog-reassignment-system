@@ -14,8 +14,8 @@ APP_CONFIG = {
 
 # Default Data URLs - UPDATE THESE WITH YOUR ACTUAL GOOGLE SHEETS URLS
 DEFAULT_URLS = {
-    "map_url": "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/export?format=csv&gid=YOUR_MAP_GID",
-    "matrix_url": "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/export?format=csv&gid=YOUR_MATRIX_GID"
+    "map_url": "https://docs.google.com/spreadsheets/d/1mg8d5CLxSR54KhNUL8SpL5jzrGN-bghTsC9vxSK8lR0/edit?gid=267803750#gid=267803750",
+    "matrix_url": "https://docs.google.com/spreadsheets/d/1421xCS86YH6hx0RcuZCyXkyBK_xl-VDSlXyDNvw09Pg/edit?gid=398422902#gid=398422902"
 }
 
 # Optimization Parameters
