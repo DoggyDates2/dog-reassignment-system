@@ -262,8 +262,8 @@ class DashboardUI:
         # Overview metrics
         self._render_overview_metrics()
         
-        # Main tabs
-        tab1, tab2, tab3, tab4 = st.tabs(["🎯 Reassignment", "📊 Analytics", "📈 History", "🔍 Data Explorer"])
+        # Main tabs - ADDED DEBUG TAB
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(["🎯 Reassignment", "📊 Analytics", "📈 History", "🔍 Data Explorer", "🔧 Debug"])
         
         with tab1:
             self._render_reassignment_tab()
@@ -276,6 +276,9 @@ class DashboardUI:
         
         with tab4:
             self._render_data_explorer_tab()
+        
+        with tab5:
+            render_debug_tab(self.session_state.data_manager)
     
     def _render_overview_metrics(self):
         """Render overview metrics cards"""
@@ -701,3 +704,211 @@ class DashboardUI:
                 distances.append(neighbors[0][1])  # Closest neighbor
         
         return sum(distances) / len(distances) if distances else 0.0
+
+
+# DEBUG FUNCTIONS ADDED BELOW
+
+def debug_live_data_mismatch(data_manager):
+    """Debug mismatches between today's dogs and master distance matrix"""
+    
+    st.header("🔄 Live Data Subset Analysis")
+    
+    if not data_manager:
+        st.error("No data manager loaded")
+        return
+    
+    # Get today's dogs vs matrix dogs
+    todays_dogs = set(data_manager.dogs.keys())
+    matrix_dogs = set(data_manager.distance_matrix.dog_ids) if data_manager.distance_matrix else set()
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Today's Dogs", len(todays_dogs))
+    with col2:
+        st.metric("Matrix Dogs", len(matrix_dogs))
+    with col3:
+        overlap = len(todays_dogs & matrix_dogs)
+        st.metric("Overlap", overlap)
+    
+    # Find mismatches
+    st.subheader("📊 Data Overlap Analysis")
+    
+    # Dogs in today's assignment but NOT in distance matrix
+    missing_from_matrix = todays_dogs - matrix_dogs
+    if missing_from_matrix:
+        st.error(f"❌ {len(missing_from_matrix)} dogs scheduled today are MISSING from distance matrix:")
+        with st.expander("Missing Dogs (this causes 0.5 distance fallbacks)"):
+            for i, dog_id in enumerate(sorted(missing_from_matrix)):
+                if i < 20:  # Show first 20
+                    dog = data_manager.dogs.get(dog_id)
+                    st.write(f"• {dog_id} - {dog.name if dog else 'Unknown'}")
+                elif i == 20:
+                    st.write(f"... and {len(missing_from_matrix) - 20} more")
+                    break
+    else:
+        st.success("✅ All today's dogs found in distance matrix!")
+    
+    # Show sample matches to verify ID formats
+    matches = todays_dogs & matrix_dogs
+    if matches:
+        st.subheader("✅ Sample Matching Dogs")
+        sample_matches = list(matches)[:5]
+        for dog_id in sample_matches:
+            dog = data_manager.dogs[dog_id]
+            st.write(f"• {dog_id} - {dog.name} ✓")
+    
+    # Test distance calculations for today's dogs
+    st.subheader("📏 Distance Test for Today's Dogs")
+    
+    if len(matches) >= 2:
+        test_dogs = list(matches)[:3]
+        for i in range(len(test_dogs)-1):
+            dog1, dog2 = test_dogs[i], test_dogs[i+1]
+            distance = data_manager.distance_matrix.get_distance(dog1, dog2)
+            
+            if distance == 0.5:
+                st.warning(f"⚠️ {dog1} → {dog2}: 0.5 (FALLBACK - check distance matrix data)")
+            elif distance == float('inf'):
+                st.info(f"🚫 {dog1} → {dog2}: ∞ (not allowed per matrix)")
+            elif distance == 0.0:
+                st.info(f"🎯 {dog1} → {dog2}: 0.0 (same dog)")
+            else:
+                st.success(f"✅ {dog1} → {dog2}: {distance} miles")
+    
+    return missing_from_matrix
+
+def debug_driver_availability(data_manager, called_out_driver: str, affected_groups):
+    """Debug why drivers might be showing as NaN"""
+    
+    st.subheader(f"🚗 Driver Availability for {called_out_driver} callout")
+    
+    if called_out_driver not in data_manager.drivers:
+        st.error(f"❌ Driver '{called_out_driver}' not found!")
+        st.write("Available drivers:", list(data_manager.drivers.keys())[:10])
+        return
+    
+    # Find dogs that need reassignment
+    dogs_needing_reassignment = []
+    for dog_id, assigned_driver in data_manager.current_assignments.items():
+        if assigned_driver == called_out_driver and dog_id in data_manager.dogs:
+            dog = data_manager.dogs[dog_id]
+            if any(group in affected_groups for group in dog.groups):
+                dogs_needing_reassignment.append(dog)
+    
+    st.write(f"Dogs needing reassignment: {len(dogs_needing_reassignment)}")
+    
+    if not dogs_needing_reassignment:
+        st.warning("No dogs need reassignment - check if driver name or groups are correct")
+        return
+    
+    # Analyze each driver's availability
+    st.subheader("Driver Capacity Analysis")
+    
+    available_count = 0
+    driver_analysis = []
+    
+    for driver_name, driver in data_manager.drivers.items():
+        if driver_name == called_out_driver:
+            continue
+        
+        # Get current loads
+        current_loads = data_manager.get_driver_current_loads(driver_name)
+        
+        analysis = {
+            'name': driver_name,
+            'total_callouts': len(driver.callouts),
+            'can_accept_any': False,
+            'issues': []
+        }
+        
+        # Check if completely called out
+        if len(driver.callouts) >= 3:
+            analysis['issues'].append("Called out all groups")
+        
+        # Check capacity for sample dog
+        if dogs_needing_reassignment:
+            sample_dog = dogs_needing_reassignment[0]
+            can_accept = True
+            
+            for group in sample_dog.groups:
+                if group in driver.callouts:
+                    analysis['issues'].append(f"Called out group {group}")
+                    can_accept = False
+                    break
+                
+                capacity = driver.get_capacity(group)
+                current_load = current_loads.get(group, 0)
+                available = capacity - current_load
+                
+                if available < sample_dog.num_dogs:
+                    analysis['issues'].append(f"Group {group}: {available}/{capacity} available, need {sample_dog.num_dogs}")
+                    can_accept = False
+            
+            analysis['can_accept_any'] = can_accept
+            if can_accept:
+                available_count += 1
+        
+        driver_analysis.append(analysis)
+    
+    # Display results
+    st.write(f"**Available drivers: {available_count}/{len(driver_analysis)}**")
+    
+    if available_count == 0:
+        st.error("🚨 NO AVAILABLE DRIVERS - This is why you're getting NaN!")
+        st.write("**Reasons:**")
+        
+        issue_summary = {}
+        for analysis in driver_analysis:
+            for issue in analysis['issues']:
+                issue_summary[issue] = issue_summary.get(issue, 0) + 1
+        
+        for issue, count in sorted(issue_summary.items(), key=lambda x: x[1], reverse=True):
+            st.write(f"• {issue}: {count} drivers")
+    
+    # Show detailed driver status
+    with st.expander("Detailed Driver Status"):
+        for analysis in driver_analysis:
+            status = "✅ Available" if analysis['can_accept_any'] else "❌ Unavailable"
+            issues = ", ".join(analysis['issues']) if analysis['issues'] else "None"
+            st.write(f"**{analysis['name']}**: {status} - {issues}")
+
+def render_debug_tab(data_manager):
+    """Debug tab for the main dashboard"""
+    
+    st.header("🔧 System Debug")
+    
+    if not data_manager:
+        st.warning("Load data first to debug")
+        return
+    
+    # Data mismatch analysis
+    missing_dogs = debug_live_data_mismatch(data_manager)
+    
+    st.divider()
+    
+    # Driver availability test
+    st.subheader("🎯 Test Driver Scenario")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        drivers = list(data_manager.drivers.keys())
+        test_driver = st.selectbox("Test calling out driver:", drivers if drivers else ["No drivers"])
+    
+    with col2:
+        test_groups = st.multiselect("Affected groups:", [1, 2, 3], default=[1, 2, 3])
+    
+    if test_driver and test_groups and st.button("🔍 Analyze This Scenario"):
+        debug_driver_availability(data_manager, test_driver, test_groups)
+    
+    # Recommendations
+    st.divider()
+    st.subheader("💡 Recommendations")
+    
+    if missing_dogs:
+        st.warning("**Distance Matrix Issue**: Some of today's dogs aren't in your distance matrix")
+        st.write("**Solutions:**")
+        st.write("1. Update your master distance matrix to include all current dogs")
+        st.write("2. Or modify the code to handle missing dogs more gracefully")
+        st.write("3. Check if dog IDs have different formats between sheets")
+    
+    st.info("**For NaN drivers**: Usually means no drivers available due to callouts or capacity limits")
