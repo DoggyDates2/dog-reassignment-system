@@ -1,9 +1,6 @@
 """
 🐶 Optimized Dog Reassignment System
 Main Streamlit Application
-
-Author: Your Name
-Description: Multi-algorithm optimization system for dog assignment logistics
 """
 
 import streamlit as st
@@ -14,12 +11,13 @@ from pathlib import Path
 src_path = Path(__file__).parent / "src"
 sys.path.append(str(src_path))
 
+# Simple error handling for imports
 try:
     from ui_components import SessionState, DashboardUI
     from config import APP_CONFIG
 except ImportError as e:
     st.error(f"Import error: {e}")
-    st.error("Please ensure all files are uploaded correctly and refresh the page.")
+    st.error("Please check that all files are correctly formatted.")
     st.stop()
 
 def main():
