@@ -62,16 +62,23 @@ class DistanceMatrix:
         return matrix
     
     def get_distance(self, dog1_id: str, dog2_id: str) -> float:
-        if dog1_id == dog2_id:
-            return 0.0
-        
-        idx1 = self._id_to_index.get(dog1_id)
-        idx2 = self._id_to_index.get(dog2_id)
-        
-        if idx1 is None or idx2 is None:
-            return float('inf')
-        
-        return float(self._matrix[idx1][idx2])
+    """Get distance between two dogs with caching - 0 means not allowed"""
+    if dog1_id == dog2_id:
+        return 0.0  # Same dog
+    
+    idx1 = self._id_to_index.get(dog1_id)
+    idx2 = self._id_to_index.get(dog2_id)
+    
+    if idx1 is None or idx2 is None:
+        return float('inf')
+    
+    distance = float(self._matrix[idx1][idx2])
+    
+    # If distance is 0, it means "not allowed" - return infinity
+    if distance == 0.0:
+        return float('inf')
+    
+    return distance
     
     def get_neighbors(self, dog_id: str, max_distance: float = 1.0) -> List[Tuple[str, float]]:
         if dog_id not in self._id_to_index:
