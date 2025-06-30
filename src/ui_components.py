@@ -309,13 +309,10 @@ class DashboardUI:
     def _render_reassignment_tab(self):
         """Render reassignment interface"""
         st.header("🎯 Driver Callout & Reassignment")
-        # ADD THIS DEBUG CODE TO YOUR _render_reassignment_tab METHOD
-# Find the line that says: st.header("🎯 Driver Callout & Reassignment")
-# Add this code RIGHT AFTER that line:
 
-def _render_reassignment_tab(self):
-    """Render reassignment interface"""
-    st.header("🎯 Driver Callout & Reassignment")
+    def _render_reassignment_tab(self):
+        """Render reassignment interface"""
+        st.header("🎯 Driver Callout & Reassignment")
     
     # ===== ADD THIS DEBUG SECTION =====
     st.subheader("🔧 Debug Analysis")
