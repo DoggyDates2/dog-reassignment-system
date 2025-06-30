@@ -12,9 +12,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from collections import defaultdict
 
-from .data_manager import create_data_manager
-from .assignment_logic import create_assignment_engine, ReassignmentResult, CapacityAnalyzer
-from .config import get_map_url, get_matrix_url
+from data_manager import create_data_manager
+from assignment_logic import create_assignment_engine, ReassignmentResult, CapacityAnalyzer
+from config import get_map_url, get_matrix_url
 
 @dataclass
 class HistoryEntry:
