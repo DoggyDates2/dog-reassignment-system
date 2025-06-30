@@ -6,7 +6,7 @@ Clean, understandable assignment logic replacing complex fringe moves and domino
 from typing import Dict, List, Set, Optional, Tuple
 from dataclasses import dataclass
 from collections import defaultdict
-from .optimization_engine import MultiAlgorithmOptimizer, AssignmentSolution
+from optimization_engine import MultiAlgorithmOptimizer, AssignmentSolution
 
 @dataclass
 class ReassignmentResult:
